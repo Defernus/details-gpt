@@ -1,0 +1,10 @@
+.markdown {
+    details {
+        padding-left: 1em;
+    }
+
+    details>summary {
+        margin-left: -1em;
+        cursor: pointer;
+    }
+}

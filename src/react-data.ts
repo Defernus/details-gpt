@@ -11,16 +11,23 @@ export const extractMessageContent = async (messageElement: HTMLElement, attempt
 
         const messageInner = messageElement.firstChild?.firstChild;
         if (!messageInner) {
-            console.log("No first child found", { messageElement, attempts: i });
             await sleep(TIMEOUT);
             lastReason = "firstChild";
             continue;
         }
 
         if (!(messageInner instanceof HTMLDivElement)) {
-            console.log("First child is not a div", { messageElement, attempts: i });
             await sleep(TIMEOUT);
             lastReason = "firstChildDiv";
+            continue;
+        }
+
+        if (
+            !messageInner.classList.contains("markdown")
+            || messageInner.classList.contains("result-streaming")
+        ) {
+            await sleep(TIMEOUT);
+            lastReason = "notMarkdownYet";
             continue;
         }
 
@@ -29,7 +36,6 @@ export const extractMessageContent = async (messageElement: HTMLElement, attempt
             || messageInner.classList.contains("result-thinking")
             || messageInner.classList.contains("result-streaming")
         ) {
-            console.log("Message is still streaming", { messageElement, classes: messageInner.classList.value });
             await sleep(TIMEOUT);
             lastReason = "streaming-animation";
             continue;
@@ -49,7 +55,6 @@ export const extractMessageContent = async (messageElement: HTMLElement, attempt
         if (!result) {
             await sleep(TIMEOUT);
             lastReason = "result";
-            console.log("No result found", { result, fiberData });
             continue;
         }
         if (Array.isArray(result)) {
@@ -68,7 +73,6 @@ export const getFiberFromDom = (dom: HTMLElement): any => {
         if (
             key.startsWith("__reactFiber$")
         ) {
-            console.log("Found react fiber key", key);
             return (dom as any)[key];
         }
     }

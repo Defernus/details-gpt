@@ -4,16 +4,19 @@
   "main": "content-script.js",
   "scripts": {
     "build": "webpack",
-    "watch": "webpack --watch"
+    "watch": "webpack --watch",
+    "bundle": "web-ext build --overwrite-dest",
+    "pack": "npm run build && npm run bundle"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "description": "",
   "devDependencies": {
-    "@types/chrome": "^0.0.320",
+    "@types/chrome": "^0.0.322",
     "ts-loader": "^9.5.2",
     "typescript": "^5.8.3",
+    "web-ext": "^8.6.0",
     "webpack": "^5.99.8",
     "webpack-cli": "^6.0.1"
   }

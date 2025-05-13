@@ -2,9 +2,9 @@
     "manifest_version": 3,
     "name": "details-gpt",
     "version": "0.1.0",
-    "description": "Safely parses literal <details>...</details> in page into interactive elements",
+    "description": "Browser extension to enhance ChatGPT's messages rendering",
     "icons": {
-        "512": "logo512.png"
+        "512": "static/logo512.png"
     },
     "content_scripts": [
         {
@@ -24,7 +24,8 @@
     "web_accessible_resources": [
         {
             "resources": [
-                "dist/main.js"
+                "dist/main.js",
+                "static/injected-styles.css"
             ],
             "matches": [
                 "https://chatgpt.com/*"

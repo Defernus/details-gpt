@@ -3,9 +3,15 @@ const initExtension = () => {
     script.src = chrome.runtime.getURL("dist/main.js");
     script.id = "details-gpt";
 
-    console.log("Injecting details-gpt extension script");
+    const style = document.createElement("link");
+    style.rel = "stylesheet";
+    style.href = chrome.runtime.getURL("static/injected-styles.css");
+    style.id = "details-gpt-styles";
+
+    console.log("Injecting details-gpt extension script and styles");
 
     document.head.appendChild(script);
+    document.head.appendChild(style);
 };
 
 
