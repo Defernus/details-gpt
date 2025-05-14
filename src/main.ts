@@ -1,7 +1,8 @@
-import { applyMarkdownChanges, TagToTransformData } from "./build-markdown";
+import { applyMarkdownChanges } from "./build-markdown";
+import { TagInfo } from "./build-markdown/tag-info";
 import { extractMessageContent } from "./react-data";
 
-const TAGS_TO_HANDLE: Record<string, TagToTransformData> = {
+const TAGS_TO_HANDLE: Record<string, TagInfo> = {
     details: {
         createTag: () => document.createElement("details"),
         filterAttributes: (attribute) => attribute.name === "open" && !attribute.value,
@@ -12,6 +13,10 @@ const TAGS_TO_HANDLE: Record<string, TagToTransformData> = {
     },
     strong: {
         createTag: () => document.createElement("strong"),
+        filterAttributes: (_attribute) => false,
+    },
+    code: {
+        createTag: () => document.createElement("code"),
         filterAttributes: (_attribute) => false,
     }
 };

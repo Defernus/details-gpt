@@ -1,13 +1,10 @@
-export type TagToTransformData = {
-    createTag: () => HTMLElement,
-    /**
-     * Check if the attribute is allowed
-     */
-    filterAttributes: (attribute: TagAttribute) => boolean,
-};
+import { TagAttribute } from "../attribute";
+import { AppError } from "../error";
+import { tokenizeText } from "../tokenizer/token-parsers";
+import { TagInfo } from "./tag-info";
 
 const isTagAllowed = (
-    tagsToHandle: Record<string, TagToTransformData>,
+    tagsToHandle: Record<string, TagInfo>,
     tag: string,
 ) => Object.keys(tagsToHandle).includes(tag);
 
@@ -22,7 +19,7 @@ const SHOULD_TRANSFORM_TAGS = [
 ];
 const shouldTransformElement = (element: Element) => SHOULD_TRANSFORM_TAGS.includes(element.tagName);
 
-const applyAttributes = (element: HTMLElement, tagData: TagToTransformData, attributes: TagAttribute[]) => {
+const applyAttributes = (element: HTMLElement, tagData: TagInfo, attributes: TagAttribute[]) => {
     attributes
         .filter((attr) => tagData.filterAttributes(attr))
         .forEach(({ name, value }) => {
@@ -31,7 +28,7 @@ const applyAttributes = (element: HTMLElement, tagData: TagToTransformData, attr
 };
 
 export const applyMarkdownChanges = (
-    tagsToHandle: Record<string, TagToTransformData>,
+    tagsToHandle: Record<string, TagInfo>,
     wrapper: HTMLElement,
 ) => {
     if (!shouldTransformElement(wrapper)) {
@@ -54,9 +51,16 @@ export const applyMarkdownChanges = (
     try {
         tagList = collectTagsToHandle(tagsToHandle, wrapper);
     } catch (error: any) {
-        throw new MdError("Error collecting tags", { data: { data: error.data, wrapper }, cause: error });
+        throw new AppError("Error collecting tags", { data: { data: error.data, wrapper }, cause: error });
     }
 
+    handleNewTags(tagsToHandle, tagList);
+};
+
+const handleNewTags = (
+    tagsToHandle: Record<string, TagInfo>,
+    tagList: TagData[],
+) => {
     for (let i = 0; i < tagList.length; ++i) {
         const {
             tag,
@@ -75,16 +79,16 @@ export const applyMarkdownChanges = (
         } = tagList[i];
 
         if (!startNode.textContent) {
-            throw new MdError("tagData.startNode.textContent is undefined", { data: { tagToHandle: tagList[i] } });
+            throw new AppError("tagData.startNode.textContent is undefined", { data: { tagToHandle: tagList[i] } });
         }
 
         if (!endNode.textContent) {
-            throw new MdError("tagData.endNode.textContent is undefined", { data: { tagToHandle: tagList[i] } });
+            throw new AppError("tagData.endNode.textContent is undefined", { data: { tagToHandle: tagList[i] } });
         }
 
         const tagData = tagsToHandle[tag.toLowerCase()];
         if (!tagData) {
-            throw new MdError("Tag is not allowed", { data: { tagToHandle: tagList[i] } });
+            throw new AppError("Tag is not allowed", { data: { tagToHandle: tagList[i] } });
         }
 
         const textBeforeTag = document.createTextNode(startNode.textContent.slice(0, tagOpenStartChar));
@@ -93,7 +97,7 @@ export const applyMarkdownChanges = (
         let tagElement: HTMLElement;
         if (startNode === endNode) {
             if (nodes.length > 0) {
-                throw new MdError(
+                throw new AppError(
                     "tagData.startNode and tagData.endNode are the same, but tagData.nodes are not empty",
                     { data: { tagToHandle: tagList[i] } },
                 );
@@ -171,7 +175,7 @@ type TagData = {
     attributes: TagAttribute[],
 };
 
-const collectTagsToHandle = (tagsToHandle: Record<string, TagToTransformData>, wrapper: HTMLElement): TagData[] => {
+const collectTagsToHandle = (tagsToHandle: Record<string, TagInfo>, wrapper: HTMLElement): TagData[] => {
     const result: TagData[] = [];
 
     let openTags: {
@@ -185,149 +189,79 @@ const collectTagsToHandle = (tagsToHandle: Record<string, TagToTransformData>, w
     }[] = [];
 
     wrapper.childNodes.forEach((child) => {
-        let tagSearchOffset = 0;
-
         if (!(child instanceof Text) || !child.textContent) {
             openTags[0]?.nodes.push(child);
 
             return;
         }
 
-        while (true) {
-            const nextTag = getNextTag(tagSearchOffset, child.textContent);
-            if (!nextTag) {
-                openTags[0]?.nodes.push(child);
-                break;
-            }
-            tagSearchOffset = nextTag.end;
+        const tokenList = tokenizeText(child.textContent);
 
-            if (!isTagAllowed(tagsToHandle, nextTag.tagName)) {
-                continue;
-            }
+        for (const token of tokenList) {
+            if (token.type === "code") {
+                if (openTags.length === 0) {
+                    result.push({
+                        tag: "code",
+                        attributes: [],
+                        startNode: child,
+                        tagOpenStartChar: token.start,
+                        tagOpenEndChar: token.start + token.quote.length,
+                        endNode: child,
+                        tagCloseStartChar: token.end - token.quote.length,
+                        tagCloseEndChar: token.end,
+                        nodes: [],
+                    });
+                }
+            } else if (token.type === "openTag") {
+                if (token.isSelfClosing) {
+                    throw new AppError("Self closing tags are not supported", { data: { tokenList, token, element: child } });
+                }
 
-            if (nextTag.isOpen) {
+                if (!isTagAllowed(tagsToHandle, token.tagName)) {
+                    continue;
+                }
+
                 // register tag open
                 openTags.push({
                     startNode: child,
-                    tagOpenStartChar: nextTag.start,
-                    tagOpenEndChar: nextTag.end,
-                    tag: nextTag.tagName,
-                    attributes: nextTag.attributes,
+                    tagOpenStartChar: token.start,
+                    tagOpenEndChar: token.end,
+                    tag: token.tagName,
+                    attributes: token.attributes,
                     nodes: [],
                 });
-                continue;
-            }
+            } else if (token.type === "closeTag") {
+                // register tag close
+                const openTag = openTags.pop();
+                if (!openTag) {
+                    throw new AppError("No open tag found for closing tag", { data: { openTag, tokenList, token, child } });
+                }
 
-            // register tag close
-            const openTag = openTags.pop();
-            if (!openTag) {
-                throw new MdError("No open tag found for closing tag", { data: { openTag, nextTag, child } });
-            }
+                if (openTag.tag !== token.tagName) {
+                    throw new AppError("Mismatched tags", { data: { openTag, tokenList, token, child } });
+                }
 
-            if (openTag.tag !== nextTag.tagName) {
-                throw new MdError("Mismatched tags", { data: { openTag, nextTag, child } });
-            }
-
-            // NOTE: skip nested tags, they should be handled recursively
-            if (openTags.length === 0) {
-                result.push({
-                    tag: openTag.tag,
-                    startNode: openTag.startNode,
-                    tagOpenStartChar: openTag.tagOpenStartChar,
-                    tagOpenEndChar: openTag.tagOpenEndChar,
-                    endNode: child,
-                    nodes: openTag.nodes,
-                    tagCloseStartChar: nextTag.start,
-                    tagCloseEndChar: nextTag.end,
-                    attributes: openTag.attributes,
-                });
+                // NOTE: skip nested tags, they should be handled recursively
+                if (openTags.length === 0) {
+                    result.push({
+                        tag: openTag.tag,
+                        startNode: openTag.startNode,
+                        tagOpenStartChar: openTag.tagOpenStartChar,
+                        tagOpenEndChar: openTag.tagOpenEndChar,
+                        endNode: child,
+                        nodes: openTag.nodes,
+                        tagCloseStartChar: token.start,
+                        tagCloseEndChar: token.end,
+                        attributes: openTag.attributes,
+                    });
+                }
             }
         }
     });
 
     if (openTags.length > 0) {
-        throw new MdError("Unclosed tags found", { data: openTags });
+        throw new AppError("Unclosed tags found", { data: { unclosedTags: openTags } });
     }
 
     return result;
 };
-
-type TagAttribute = {
-    name: string,
-    value?: string,
-};
-
-type TagToken = {
-    tagName: string,
-    start: number,
-    end: number,
-    isOpen: boolean,
-    attributes: TagAttribute[],
-};
-
-const getNextTag = (textOffset: number, text: string): TagToken | null => {
-    const matchTag = text.slice(textOffset).match(/<(\/?)([a-zA-Z][a-zA-Z0-9-]*)(\s+[^>]*)?>/);
-
-    if (!matchTag) {
-        return null;
-    }
-
-    if (matchTag.index === undefined) {
-        throw new MdError("matchTag.index is undefined");
-    }
-
-    const tagName = matchTag[2];
-    const isOpen = matchTag[1] === "";
-    const tagStart = textOffset + matchTag.index;
-    const tagEnd = tagStart + matchTag[0].length;
-
-    return {
-        tagName,
-        start: tagStart,
-        end: tagEnd,
-        isOpen,
-        attributes: matchTag[3] ? parseAttributes(matchTag[3]) : [],
-    };
-};
-
-const parseAttributes = (attributes: string): TagAttribute[] => {
-    const result: { name: string, value?: string }[] = [];
-
-    let restUnparsed = attributes.trim();
-
-    while (restUnparsed.length > 0) {
-        const match = restUnparsed.match(/^([a-zA-Z][a-zA-Z0-9-]*)(\s*=\s*("[^"]*"|'[^']*'|[^\s>]*))?/);
-        if (!match) {
-            return result;
-        }
-
-        const name = match[1];
-        let value = match[3];
-        if (value) {
-            try {
-                value = JSON.parse(value);
-            }
-            catch (e) {
-                throw new MdError("Failed to parse attribute value", { data: { value, attributes } });
-            }
-        }
-
-        restUnparsed = restUnparsed.slice(match[0].length).trim();
-
-        result.push({ name, value });
-    }
-
-    return result;
-};
-
-
-export class MdError extends Error {
-    data?: any;
-
-    constructor(message: string, options: { data?: any, cause?: unknown } = {}) {
-        super(message, { cause: options.cause });
-        this.name = "MdError";
-        this.data = options.data;
-
-    }
-}

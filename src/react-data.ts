@@ -1,3 +1,4 @@
+import { AppError } from "./error";
 import { sleep } from "./utils";
 
 const TIMEOUT = 500;
@@ -6,7 +7,7 @@ export const extractMessageContent = async (messageElement: HTMLElement, attempt
     let lastReason = "attempts";
     for (let i = 0; i < attempts; ++i) {
         if (!messageElement.isConnected) {
-            throw new Error("Message element is not connected");
+            throw new AppError("Message element is not connected");
         }
 
         const messageInner = messageElement.firstChild?.firstChild;
@@ -62,10 +63,10 @@ export const extractMessageContent = async (messageElement: HTMLElement, attempt
         }
 
         console.error("Result is not an array", { result, fiberData, aaa: !fiberData });
-        throw new Error("Result is not an array");
+        throw new AppError("Result is not an array");
     }
     console.warn("Max attempts reached", { messageElement, lastReason });
-    throw new Error("Max attempts reached");
+    throw new AppError("Max attempts reached");
 };
 
 export const getFiberFromDom = (dom: HTMLElement): any => {
