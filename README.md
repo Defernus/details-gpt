@@ -21,3 +21,4 @@ Please include expandable sections for any optional notes, advanced tips, or dee
 ## Features
 
 - [x] `<details>` and `<summary>` tags rendering
+- [ ] add `data-start` and `data-end` attributes elements created by extension
