@@ -15,7 +15,7 @@ Browser extension to enhance ChatGPT messages rendering!
 Make sure you have the latest version of [npm](https://www.npmjs.com/get-npm) installed.
 
 - Clone this repo
-- Run `npm install` no install deps, then `npm run watch` to start the watcher
+- Run `npm install` to install deps, then `npm run watch` to start the watcher
 - Open `chrome://extensions`
 - Enable developer mode and load the root folder of this repo as an unpacked extension. 
 - Ask ChatGPT to use the `<details>` tag in the next message (or add [custom instruction](https://openai.com/index/custom-instructions-for-chatgpt/) to always use it)
