@@ -142,7 +142,7 @@ const handleNewTags = (
 const fixRestTags = (tagList: TagData[], endNode: Text, newEndNode: Text, offset: number) => {
     for (const tag of tagList) {
         if (tag.startNode !== endNode) {
-            return;
+            continue;
         }
 
         tag.startNode = newEndNode;
