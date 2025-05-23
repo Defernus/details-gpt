@@ -33,4 +33,6 @@ coverage/
 # Optional eslint cache
 .eslintcache
 
+/tmp
+
 /web-ext-artifacts

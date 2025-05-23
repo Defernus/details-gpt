@@ -8,6 +8,12 @@ const isTagAllowed = (
     tag: string,
 ) => Object.keys(tagsToHandle).includes(tag);
 
+export const DETAILS_GPT_ATTRIBUTE_NAME = "data-details-gpt";
+
+export const isExtensionElement = (element: HTMLElement) => {
+    return element.getAttribute(DETAILS_GPT_ATTRIBUTE_NAME) !== null;
+};
+
 const SHOULD_TRANSFORM_TAGS = [
     "DIV",
     "OL",
@@ -17,7 +23,9 @@ const SHOULD_TRANSFORM_TAGS = [
     "DETAILS",
     "SUMMARY",
 ];
-const shouldTransformElement = (element: Element) => SHOULD_TRANSFORM_TAGS.includes(element.tagName);
+const shouldTransformElement = (element: HTMLElement) => (
+    SHOULD_TRANSFORM_TAGS.includes(element.tagName)
+);
 
 const applyAttributes = (element: HTMLElement, tagData: TagInfo, attributes: TagAttribute[]) => {
     attributes
@@ -55,6 +63,10 @@ export const applyMarkdownChanges = (
     }
 
     handleNewTags(tagsToHandle, tagList);
+};
+
+const onTagCreated = (element: HTMLElement) => {
+    element.setAttribute(DETAILS_GPT_ATTRIBUTE_NAME, "");
 };
 
 const handleNewTags = (
@@ -104,12 +116,15 @@ const handleNewTags = (
             }
 
             tagElement = tagData.createTag();
+            onTagCreated(tagElement);
+
             tagElement.textContent = startNode.textContent.slice(tagOpenEndChar, tagCloseStartChar);
 
             startNode.replaceWith(textBeforeTag, tagElement, textAfterTag);
         } else {
             // build tag element and move all `tagData.nodes` inside it
             tagElement = tagData.createTag();
+            onTagCreated(tagElement);
 
             const textAfterTagStart = document.createTextNode(
                 startNode.textContent.slice(tagOpenEndChar),
@@ -231,6 +246,10 @@ const collectTagsToHandle = (tagsToHandle: Record<string, TagInfo>, wrapper: HTM
                     nodes: [],
                 });
             } else if (token.type === "closeTag") {
+                if (!isTagAllowed(tagsToHandle, token.tagName)) {
+                    continue;
+                }
+
                 // register tag close
                 const openTag = openTags.pop();
                 if (!openTag) {
