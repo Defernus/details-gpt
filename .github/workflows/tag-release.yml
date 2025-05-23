@@ -1,0 +1,42 @@
+name: Release build on tag
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+      - run: npm ci
+      - run: npm run pack
+      - uses: actions/upload-artifact@v3
+        with:
+          name: extension
+          path: web-ext-artifacts/*.zip
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions: inherit
+    steps:
+      - uses: actions/download-artifact@v3
+        with:
+          name: extension
+          path: web-ext-artifacts
+      - uses: softprops/action-gh-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          files: web-ext-artifacts/*.zip
